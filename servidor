@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 import asyncio
+from cgitb import text
+
+from requests import request
 from tcp import Servidor
 import re
 
-
 def validar_nome(nome):
     return re.match(br'^[a-zA-Z][a-zA-Z0-9_-]*$', nome) is not None
-
 
 def sair(conexao):
     print(conexao, 'conexão fechada')
@@ -14,16 +15,50 @@ def sair(conexao):
 
 
 def dados_recebidos(conexao, dados):
+    dados = conexao.dados_residuais + dados
+    conexao.dados_residuais = b''
+
     if dados == b'':
         return sair(conexao)
+
+    if not dados.endswith(b'\r\n'):
+        dados = list(filter((b'').__ne__, dados.split(b'\r\n')))
+        conexao.dados_residuais += dados.pop()
+    
+    else:
+        dados = list(filter((b'').__ne__, dados.split(b'\r\n')))  
+
+    if dados:
+        for message in dados:
+            print(str(message))
+            request, text = message.split(b' ', 1)
+
+            if request == b'PING':
+                conexao.enviar(b':server PONG server :' + text + b'\r\n')
+
+            if request == b'NICK':
+                if validar_nome(text):
+                    if text.lower() in servidor.apelido_conexoes and servidor.apelido_conexoes[text.lower()] != conexao:
+                        conexao.enviar(b':server 433 ' + conexao.nickid + b' ' + text + b' :Nickname is already in use\r\n')
+                    elif conexao.nickid == b'*': 
+                            conexao.enviar(b':server 001 ' + text + b' :Welcome\r\n' + b':server 422 ' + text + b' :MOTD File is missing\r\n')
+                    else: 
+                            conexao.enviar(b':' + conexao.nickid + b' NICK ' + text + b'\r\n')
+                    conexao.nickid = text.lower()
+                else:
+                    conexao.enviar(b':server 432 ' + conexao.nickid + b' ' + text + b' :Erroneous nickname\r\n') 
     print(conexao, dados)
 
 
 def conexao_aceita(conexao):
     print(conexao, 'nova conexão')
+    conexao.nickid = b'*'
+    conexao.dados_residuais = b''
+    servidor.apelido_conexoes[conexao.nickid] = conexao
     conexao.registrar_recebedor(dados_recebidos)
 
-
 servidor = Servidor(6667)
+servidor.apelido_conexoes = {}
+servidor.conexoes = []
 servidor.registrar_monitor_de_conexoes_aceitas(conexao_aceita)
 asyncio.get_event_loop().run_forever()

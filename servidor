@@ -19,7 +19,7 @@ def dados_recebidos(conexao, dados):
     conexao.dados_residuais = b''
 
     if dados == b'':
-        return sair(conexao)
+        return sair(conexao) 
 
     if not dados.endswith(b'\r\n'):
         dados = list(filter((b'').__ne__, dados.split(b'\r\n')))
@@ -65,12 +65,23 @@ def dados_recebidos(conexao, dados):
             
             if request == b'JOIN':
                 if text.startswith(b'#') and validar_nome(text[1:]):
-                    if text.lower()  not in servidor.channels:
+                    if text.lower() not in servidor.channels:
                         servidor.channels[text.lower()] = {}
                     servidor.channels[text.lower()][conexao.nickid.lower()] = conexao
 
+                    if text.lower() not in servidor.conexoes:
+                        servidor.conexoes.append(text.lower())
+                    membros = b''
+
                     for key in servidor.channels[text.lower()]:
                         servidor.channels[text.lower()][key].enviar(b':' + conexao.nickid + b' JOIN :' + text + b'\r\n')
+
+                    for key in sorted(servidor.channels[text.lower()].keys()): 
+                        membros += key + b' '
+                    send = b':server 353 ' + conexao.nickid + b' = ' + text + b' :' + membros #Enviando mensagem com os nicks de membros do canal
+                    conexao.enviar(send + b'\r\n' + b':server 366 ' + conexao.nickid + b' ' + text + b' :End of /NAMES list.\r\n')
+                else:
+                    conexao.enviar(b':server 403 ' + text + b' :No such channel.\r\n') #Mensagem de erro caso o canal não exista
 
             if request == b'PART':
                 text = text.split(b' ')[0]

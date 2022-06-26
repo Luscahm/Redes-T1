@@ -38,13 +38,18 @@ def dados_recebidos(conexao, dados):
 
             if request == b'NICK':
                 if validar_nome(text):
-                    if text.lower() in servidor.apelido_conexoes and servidor.apelido_conexoes[text.lower()] != conexao:
+                    if text.lower() in servidor.apelido_conexoes: #verificando se o nick ja  esta na lista do server
                         conexao.enviar(b':server 433 ' + conexao.nickid + b' ' + text + b' :Nickname is already in use\r\n')
                     elif conexao.nickid == b'*': 
                             conexao.enviar(b':server 001 ' + text + b' :Welcome\r\n' + b':server 422 ' + text + b' :MOTD File is missing\r\n')
+                            servidor.apelido_conexoes[text.lower()] = conexao #adicionando a conexao nova ao dicionario da forma nick:conexao
+                            conexao.nickid = text
                     else: 
                             conexao.enviar(b':' + conexao.nickid + b' NICK ' + text + b'\r\n')
-                    conexao.nickid = text.lower()
+                            servidor.apelido_conexoes.pop(conexao.nickid.lower()) # como iremos atualizar o nick, precisamos remover o antigo de nossa lista
+                            servidor.apelido_conexoes[text.lower()] = conexao
+                            conexao.nickid = text
+                            
                 else:
                     conexao.enviar(b':server 432 ' + conexao.nickid + b' ' + text + b' :Erroneous nickname\r\n') 
     print(conexao, dados)
@@ -54,7 +59,6 @@ def conexao_aceita(conexao):
     print(conexao, 'nova conexão')
     conexao.nickid = b'*'
     conexao.dados_residuais = b''
-    servidor.apelido_conexoes[conexao.nickid] = conexao
     conexao.registrar_recebedor(dados_recebidos)
 
 servidor = Servidor(6667)

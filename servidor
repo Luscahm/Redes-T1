@@ -48,10 +48,30 @@ def dados_recebidos(conexao, dados):
                             conexao.enviar(b':' + conexao.nickid + b' NICK ' + text + b'\r\n')
                             servidor.apelido_conexoes.pop(conexao.nickid.lower()) # como iremos atualizar o nick, precisamos remover o antigo de nossa lista
                             servidor.apelido_conexoes[text.lower()] = conexao
-                            conexao.nickid = text
-                            
+                            conexao.nickid = text             
                 else:
                     conexao.enviar(b':server 432 ' + conexao.nickid + b' ' + text + b' :Erroneous nickname\r\n') 
+            if request == b'PRIVMSG':
+                addressee, msg = text.split(b' ', 1)
+                print('aqui')
+                if addressee.startswith(b'#'):
+                    if addressee.lower() in servidor.channels:
+                        for key in servidor.channels[addressee.lower()]:
+                            if servidor.channels[addressee.lower()][key] != conexao:
+                                servidor.channels[addressee.lower()][key].enviar(b':' + conexao.nickid + b' PRIVMSG ' + addressee + b' ' + msg + b'\r\n')
+                elif addressee.lower() in servidor.apelido_conexoes:
+                    servidor.apelido_conexoes[addressee.lower()].enviar(b':' + conexao.nickid + b' PRIVMSG ' + addressee + b' ' + msg + b'\r\n')
+            if request == b'JOIN':
+                if text.startswith(b'#') and validar_nome(text[1:]):
+                    if text.lower()  not in servidor.channels:
+                        servidor.channels[text.lower()] = {}
+                    servidor.channels[text.lower()][conexao.nickid.lower()] = conexao
+
+                    for key in servidor.channels[text.lower()]:
+                        servidor.channels[text.lower()][key].enviar(b':' + conexao.nickid + b' JOIN :' + text + b'\r\n')
+
+
+                    
     print(conexao, dados)
 
 
@@ -63,6 +83,7 @@ def conexao_aceita(conexao):
 
 servidor = Servidor(6667)
 servidor.apelido_conexoes = {}
+servidor.channels = {}
 servidor.conexoes = []
 servidor.registrar_monitor_de_conexoes_aceitas(conexao_aceita)
 asyncio.get_event_loop().run_forever()
